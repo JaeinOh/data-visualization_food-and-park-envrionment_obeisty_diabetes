@@ -8,6 +8,9 @@ library(sf)
 library(tigris)
 library(tmap)
 
+#Data dictionary
+#aorv = obesity rate
+#dprv = diabetes rate
 
 #read US State and County shapefile
 st <- states()
@@ -115,42 +118,42 @@ gwr_aorv_results_significant_urv <- gwr_aorv_results %>%
 
 merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_urv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-#mhshd_inc
+#mhshd_inc (median household income)
 gwr_aorv_results_significant_mhshd_inc <- gwr_aorv_results %>%
   filter(t_mhshd_inc >= 1.96 | t_mhshd_inc <= -1.96) %>%
   select(FIPS_Code, beta_mhshd_inc, t_mhshd_inc)
 
 merge_spatial_non_spatial_aorv  <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_mhshd_inc, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-#nhaarv
+#nhaarv (non-Hispanic Black)
 gwr_aorv_results_significant_nhaarv <- gwr_aorv_results %>%
   filter(t_nhaarv >= 1.96 | t_nhaarv <= -1.96) %>%
   select(FIPS_Code, beta_nhaarv, t_nhaarv)
 
 merge_spatial_non_spatial_aorv  <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_nhaarv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-#hrv
+#hrv (Hispanic)
 gwr_aorv_results_significant_hrv <- gwr_aorv_results %>%
   filter(t_hrv >= 1.96 | t_hrv <= -1.96) %>%
   select(FIPS_Code, beta_hrv, t_hrv)
 
 merge_spatial_non_spatial_aorv   <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_hrv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-#nhwrv
+#nhwrv (non-Hispanic White)
 gwr_aorv_results_significant_nhwrv <- gwr_aorv_results %>%
   filter(t_nhwrv >= 1.96 | t_nhwrv <= -1.96) %>%
   select(FIPS_Code, beta_nhwrv, t_nhwrv)
 
 merge_spatial_non_spatial_aorv  <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_nhwrv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-#frv
+#frv (Female)
 gwr_aorv_results_significant_frv <- gwr_aorv_results %>%
   filter(t_frv >= 1.96 | t_frv <= -1.96) %>%
   select(FIPS_Code, beta_frv, t_frv)
 
 merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_frv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-#m_age
+#m_age (Median age)
 gwr_aorv_results_significant_m_age <- gwr_aorv_results %>%
   filter(t_m_age >= 1.96 | t_m_age <= -1.96) %>%
   select(FIPS_Code, beta_m_age, t_m_age)
@@ -158,47 +161,44 @@ gwr_aorv_results_significant_m_age <- gwr_aorv_results %>%
 merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_m_age, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
 
-#bdh
+#bdh (Education = Bachelor's Degree or Higher)
 gwr_aorv_results_significant_bdh <- gwr_aorv_results %>%
   filter(t_bdh >= 1.96 | t_bdh <= -1.96) %>%
   select(FIPS_Code, beta_bdh, t_bdh)
 
 merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_bdh, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-#carown
+#carown (Car ownership)
 gwr_aorv_results_significant_carown <- gwr_aorv_results %>%
   filter(t_carown >= 1.96 | t_carown <= -1.96) %>%
   select(FIPS_Code, beta_carown, t_carown)
 
 merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_carown, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-#prk_10m_r
+#prk_10m_r (park access within 10 minutes by walk)
 gwr_aorv_results_significant_prk_10m_r <- gwr_aorv_results %>%
   filter(t_prk_10m_r >= 1.96 | t_prk_10m_r <= -1.96) %>%
   select(FIPS_Code, beta_prk_10m_r, t_prk_10m_r)
   
 merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_prk_10m_r, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-#lac_grspm
+#lac_grspm (limited access to grocery stores)
 gwr_aorv_results_significant_lac_grspm <- gwr_aorv_results %>%
   filter(t_lac_grspm >= 1.96 | t_lac_grspm <= -1.96) %>%
   select(FIPS_Code, beta_lac_grspm, t_lac_grspm)
 
 merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_lac_grspm, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-#fastfd_dn
+#fastfd_dn (fast-food restaurants density)
 gwr_aorv_results_significant_fastfd_dn <- gwr_aorv_results %>%
   filter(t_fastfd_dn >= 1.96 | t_fastfd_dn <= -1.96) %>%
   select(FIPS_Code, beta_fastfd_dn, t_fastfd_dn)
   
 merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_fastfd_dn, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
 
-
 #plotting coefficients starting from here
 #coefficients (park access)
 summary(merge_spatial_non_spatial_aorv$beta_prk_10m_r)
-
-#refer research paper "Spatially-varying effects of built environment determinants on walking" when writing decription of maps in word document (coefficients for obesity and variables, coefficients for diabetes and variables)
 
 #use this (park access)
 map_coefficients_park_access <- tm_shape(merge_spatial_non_spatial_aorv) + tm_borders(col="gray", lwd=0.1) +
