@@ -1,0 +1,874 @@
+
+#For data visualization (plot)
+#load required packages
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(sf)
+library(tigris)
+library(tmap)
+
+
+#read US State and County shapefile
+st <- states()
+us_counties <- counties()
+
+#remove leading zeros
+us_counties <- us_counties %>%
+  mutate(FIPS_Code = str_remove(GEOID, "^0+"))
+
+sort(us_counties$FIPS_Code)
+
+#subset to extract data with column = FIPS_Code
+us_counties_FIPS_Code <- subset(us_counties, select = c(FIPS_Code)) %>%
+    st_transform(4326)
+
+gwr_aorv_results <- read_csv("GWR_aorv_results.csv")
+
+#jump to gwr_dprv_results if obesity is done
+#before that, create st_contiguous (Contiguous USA polygon), search and find st_contiguous
+
+#merge non-spatial and spatial data
+#may need to do
+merge_spatial_non_spatial <- merge(us_counties_FIPS_Code, gwr_aorv_results, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+class(merge_spatial_non_spatial$FIPS_Code)
+
+#change the class to double or numeric
+merge_spatial_non_spatial$FIPS_Code <- as.double(merge_spatial_non_spatial$FIPS_Code)
+
+merge_spatial_non_spatial_aorv <- merge_spatial_non_spatial %>%
+  select(FIPS_Code, localR2)
+
+
+--------------------------------------------------------------------------------
+
+##start plotting
+
+#add states polygon as background
+st <- states()
+
+#Contiguous US (48 States), remove other states or islands
+st_contiguous <- st %>%
+  filter(NAME != "Puerto Rico" & NAME != "Commonwealth of the Northern Mariana Islands" & NAME != "Hawaii" & NAME != "American Samoa" & NAME != "Guam" & NAME != "Alaska" & NAME != "United States Virgin Islands") %>%
+  st_transform(4326)
+
+#Choropleth map
+
+#load geographically weigted regression results of obesity
+gwr_aorv_data <- read_csv("data_052522_center_cty_aorv.csv")
+
+merge_spatial_non_spatial_aorv_main_dt  <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_data, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#obesity rate summary
+summary(merge_spatial_non_spatial_aorv_main_dt$aorv)
+
+#use this (obesity) quantile = decile (10 groups)
+map_obesity <- tm_shape(merge_spatial_non_spatial_aorv_main_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "aorv", style = "quantile", n = 10, pal = "-RdYlBu",
+  textNA="noData", colorNA = "white", title = "Obesity (%)") +
+  tm_layout(main.title = "Obesity", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+
+#save to jpg file
+tmap_save(tm = map_obesity, filename = "coefficients_aorv_revised.jpg")
+
+
+#R_squared
+#Use this
+map_r_squared_aorv <- tm_shape(merge_spatial_non_spatial_aorv_main_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "localR2", style = "quantile", n = 10, pal = "YlOrRd",
+  textNA="noData", colorNA = "white", title = "R-squared") +
+  tm_layout(main.title = "Local R-squared", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+
+#save to jpg file
+tmap_save(tm = map_r_squared_aorv, filename = "map_r_squared_aorv_revised.jpg")
+
+
+#Load main data
+#geographically weighted regression of obesity data
+gwr_aorv_results <- read_csv("GWR_aorv_results.csv")
+
+#plot gwr coefficients
+
+#need to complete the code below to extract coefficients that are statistically significant
+#t-value significance level (95%)
+#urv
+gwr_aorv_results_significant_urv <- gwr_aorv_results %>%
+  filter(t_urv >= 1.96 | t_urv <= -1.96) %>%
+  select(FIPS_Code, beta_urv, t_urv)
+
+merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_urv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#mhshd_inc
+gwr_aorv_results_significant_mhshd_inc <- gwr_aorv_results %>%
+  filter(t_mhshd_inc >= 1.96 | t_mhshd_inc <= -1.96) %>%
+  select(FIPS_Code, beta_mhshd_inc, t_mhshd_inc)
+
+merge_spatial_non_spatial_aorv  <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_mhshd_inc, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#nhaarv
+gwr_aorv_results_significant_nhaarv <- gwr_aorv_results %>%
+  filter(t_nhaarv >= 1.96 | t_nhaarv <= -1.96) %>%
+  select(FIPS_Code, beta_nhaarv, t_nhaarv)
+
+merge_spatial_non_spatial_aorv  <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_nhaarv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#hrv
+gwr_aorv_results_significant_hrv <- gwr_aorv_results %>%
+  filter(t_hrv >= 1.96 | t_hrv <= -1.96) %>%
+  select(FIPS_Code, beta_hrv, t_hrv)
+
+merge_spatial_non_spatial_aorv   <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_hrv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#nhwrv
+gwr_aorv_results_significant_nhwrv <- gwr_aorv_results %>%
+  filter(t_nhwrv >= 1.96 | t_nhwrv <= -1.96) %>%
+  select(FIPS_Code, beta_nhwrv, t_nhwrv)
+
+merge_spatial_non_spatial_aorv  <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_nhwrv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#frv
+gwr_aorv_results_significant_frv <- gwr_aorv_results %>%
+  filter(t_frv >= 1.96 | t_frv <= -1.96) %>%
+  select(FIPS_Code, beta_frv, t_frv)
+
+merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_frv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#m_age
+gwr_aorv_results_significant_m_age <- gwr_aorv_results %>%
+  filter(t_m_age >= 1.96 | t_m_age <= -1.96) %>%
+  select(FIPS_Code, beta_m_age, t_m_age)
+
+merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_m_age, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+
+#bdh
+gwr_aorv_results_significant_bdh <- gwr_aorv_results %>%
+  filter(t_bdh >= 1.96 | t_bdh <= -1.96) %>%
+  select(FIPS_Code, beta_bdh, t_bdh)
+
+merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_bdh, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#carown
+gwr_aorv_results_significant_carown <- gwr_aorv_results %>%
+  filter(t_carown >= 1.96 | t_carown <= -1.96) %>%
+  select(FIPS_Code, beta_carown, t_carown)
+
+merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_carown, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#prk_10m_r
+gwr_aorv_results_significant_prk_10m_r <- gwr_aorv_results %>%
+  filter(t_prk_10m_r >= 1.96 | t_prk_10m_r <= -1.96) %>%
+  select(FIPS_Code, beta_prk_10m_r, t_prk_10m_r)
+  
+merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_prk_10m_r, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#lac_grspm
+gwr_aorv_results_significant_lac_grspm <- gwr_aorv_results %>%
+  filter(t_lac_grspm >= 1.96 | t_lac_grspm <= -1.96) %>%
+  select(FIPS_Code, beta_lac_grspm, t_lac_grspm)
+
+merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_lac_grspm, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#fastfd_dn
+gwr_aorv_results_significant_fastfd_dn <- gwr_aorv_results %>%
+  filter(t_fastfd_dn >= 1.96 | t_fastfd_dn <= -1.96) %>%
+  select(FIPS_Code, beta_fastfd_dn, t_fastfd_dn)
+  
+merge_spatial_non_spatial_aorv <- left_join(merge_spatial_non_spatial_aorv, gwr_aorv_results_significant_fastfd_dn, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+
+#plotting coefficients starting from here
+#coefficients (park access)
+summary(merge_spatial_non_spatial_aorv$beta_prk_10m_r)
+
+#refer research paper "Spatially-varying effects of built environment determinants on walking" when writing decription of maps in word document (coefficients for obesity and variables, coefficients for diabetes and variables)
+
+#use this (park access)
+map_coefficients_park_access <- tm_shape(merge_spatial_non_spatial_aorv) + tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_prk_10m_r", style = "quantile", n = 10, pal = "-Blues", midpoint = NA, textNA="Non-significant", colorNA = "white", title =
+  "Coefficients") +
+  tm_layout(main.title = "Park access", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#save to jpg file
+tmap_save(tm = map_coefficients_park_access, filename = "coefficients_park_access_aorv_sig_revised.jpg")
+
+
+#coefficients (education: bdh)
+summary(merge_spatial_non_spatial_aorv$beta_bdh)
+
+#use this (education: bdh)
+map_coefficients_bdh <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_bdh", style = "quantile", n = 10, pal = "-Purples", midpoint = NA, textNA="Non-significant", colorNA = "white", title =
+  "Coefficients") +
+  tm_layout(main.title = "Bachelor's degree or higher", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#save to jpg file
+tmap_save(tm = map_coefficients_bdh, filename = "coefficients_education_aorv_sig_revised.jpg")
+
+
+#coefficients (vehicle ownership)
+summary(merge_spatial_non_spatial_aorv$beta_carown)
+
+#use this (vehicle ownership)
+map_coefficients_carown <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_carown", breaks = c(-0.434, -0.199, 0, 0.164, 0.249, 0.599), pal = c("blue3", "dodgerblue3",
+  "lightsalmon", "darkorange1", "firebrick2"), textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Vehicle access", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#use this (vehicle ownership)
+map_coefficients_carown <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_carown", style = "quantile", n = 10, pal = "-Purples", midpoint = NA, textNA="Non-significant", colorNA = "white", title =
+  "Coefficients") +
+  tm_layout(main.title = "Vehicle access", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_carown, filename = "coefficients_car_ownership_aorv_sig.jpg")
+
+
+#coefficients (non-Hispanic African American)
+summary(merge_spatial_non_spatial_aorv$beta_nhaarv)
+
+#use this (non-Hispanic African American)
+map_coefficients_nhaarv <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_nhaarv", breaks = c(-2.663, -0.464, 0, 0.61, 1.291, 4.455), pal = c("blue3", "dodgerblue3",
+  "lightsalmon", "darkorange1", "firebrick2"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "non-Hispanic Black", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_nhaarv, filename = "coefficients_Black_aorv_sig.jpg")
+
+
+#coefficients (Hispanic)
+summary(merge_spatial_non_spatial_aorv$beta_hrv)
+
+#use this (Hispanic)
+map_coefficients_hrv <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_hrv", breaks = c(-2.893, -0.914, -0.533, -0.334, 0, 2.222), pal = c("blue3", "dodgerblue3",
+  "steelblue3", "lavender", "lightsalmon"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Hispanic", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_hrv, filename = "coefficients_Hispanic_aorv_sig.jpg")
+
+
+#coefficients (White)
+summary(merge_spatial_non_spatial_aorv$beta_nhwrv)
+
+#use this (White)
+map_coefficients_nhwrv <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_nhwrv", breaks = c(-3.283, -0.853, -0.397, -0.307, 0, 5.248), pal = c("blue3", "dodgerblue3",
+  "steelblue3", "lavender", "lightsalmon"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "non-Hispanic White", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_nhwrv, filename = "coefficients_White_aorv_sig.jpg")
+
+
+#coefficients (income)
+summary(merge_spatial_non_spatial_aorv$beta_mhshd_inc)
+
+#use this (income)
+map_coefficients_mhshd_inc <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_mhshd_inc", breaks = c(-0.414, -0.28, 0, 0.166, 0.241, 0.395), pal = c("blue3", "dodgerblue3",
+  "lightsalmon", "darkorange1", "firebrick2"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Median household income", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_mhshd_inc, filename = "coefficients_income_aorv_sig.jpg")
+
+
+#coefficients (median age)
+summary(merge_spatial_non_spatial_aorv$beta_m_age)
+
+#use this (median age)
+map_coefficients_m_age <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_m_age", breaks = c(-0.469, -0.28, -0.203, -0.158, 0, 0.154), pal = c("blue3", "dodgerblue3",
+  "steelblue3", "lavender", "lightsalmon"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Median age", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_m_age, filename = "coefficients_median_age_aorv_sig.jpg")
+
+
+#coefficients (unemployment)
+summary(merge_spatial_non_spatial_aorv$beta_urv)
+
+#use this (unemployment)
+map_coefficients_urv <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_urv", breaks = c(-0.427, -0.275, 0, 0.135, 0.27, 0.883), pal = c("blue3", "dodgerblue3",
+  "lightsalmon", "darkorange1", "firebrick2"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Unemployment", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_urv, filename = "coefficients_unemployment_aorv_sig.jpg")
+
+
+#coefficients (gender)
+summary(merge_spatial_non_spatial_aorv$beta_frv)
+
+#style = "quantile", n = 5, pal = "-RdYlBu"
+
+#use this (gender)
+map_coefficients_frv <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_frv", breaks = c(-0.317, 0, 0.115, 0.152, 0.206, 0.363), pal = c("dodgerblue3",
+  "lightsalmon", "darkorange1", "firebrick", "red2"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Female", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_frv, filename = "coefficients_frv_aorv_sigg.jpg")
+
+#coefficients (food desert)
+summary(merge_spatial_non_spatial_aorv$beta_lac_grspm)
+
+#use this (food desert)
+map_coefficients_lac_grspm <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_lac_grspm", style = "quantile", n = 10, pal = "OrRd", midpoint = NA, textNA="Non-significant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Food desert", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+
+#save to jpg file
+tmap_save(tm = map_coefficients_lac_grspm, filename = "coefficients_food_desert_aorv_sig_revised.jpg")
+
+
+#coefficients (food swamp)
+summary(merge_spatial_non_spatial_aorv$beta_fastfd_dn)
+  
+#use this (food swamp)
+map_coefficients_fastfd_dn <- tm_shape(merge_spatial_non_spatial_aorv) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_fastfd_dn", style = "quantile", n = 10, pal = "YlOrBr", midpoint = NA, textNA="Non-significant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Food swamp", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#save to jpg file
+tmap_save(tm = map_coefficients_fastfd_dn, filename = "coefficients_food_swamp_aorv_sig_revised.jpg")
+
+
+--------------------------------------------------------------------------------
+
+#Load diabetes data
+gwr_dprv_results <- read_csv("GWR_dprv_results.csv")
+
+#merge non-spatial and spatial data
+#may need to do
+merge_spatial_non_spatial_dprv <- merge(us_counties_FIPS_Code, gwr_dprv_results, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+class(merge_spatial_non_spatial_dprv$FIPS_Code)
+
+#change the class to double or numeric
+merge_spatial_non_spatial_dprv$FIPS_Code <- as.double(merge_spatial_non_spatial_dprv$FIPS_Code)
+
+merge_spatial_non_spatial_dprv <- merge_spatial_non_spatial_dprv %>%
+  select(FIPS_Code, localR2)
+
+--------------------------------------------------------------------------------
+#load GWR results from diabetes data
+gwr_dprv_data <- read_csv("data_just_dprv.csv")
+
+merge_spatial_non_spatial_dprv_main_dt  <- left_join(merge_spatial_non_spatial_dprv, gwr_dprv_data, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#saved for later use
+#export to csv file
+write_csv(merge_spatial_non_spatial_dprv_main_dt, "merge_spatial_non_spatial_dprv_main_dt.csv")
+
+#diabetes rate summary
+summary(merge_spatial_non_spatial_dprv_main_dt$dprv)
+
+#use this (diabetes) quantile = decile (10 groups)
+map_diabetes <- tm_shape(merge_spatial_non_spatial_dprv_main_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "dprv", style = "quantile", n = 10, pal = "-RdYlBu",
+  textNA="noData", colorNA = "white", title = "Diabetes (%)") +
+  tm_layout(main.title = "Diabetes", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#save to jpg file
+tmap_save(tm = map_diabetes, filename = "coefficients_dprv_revised.jpg")
+
+
+#R_squared
+#saved for later use
+map_r_squared_dprv <- tm_shape(merge_spatial_non_spatial_dprv_main_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "localR2", style = "quantile", n = 5, pal = c("dodgerblue3", "steelblue3",
+  "lightsalmon", "darkorange1", "firebrick2"),
+  textNA="noData", colorNA = "white", title = "R-squared") +
+  tm_layout(main.title = "Local R-squared", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#use this for diabetes R-squared
+map_r_squared_dprv <- tm_shape(merge_spatial_non_spatial_dprv_main_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "localR2", style = "quantile", n = 10, pal = "YlOrRd",
+  textNA="noData", colorNA = "white", title = "R-squared") +
+  tm_layout(main.title = "Local R-squared", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+
+#save to jpg file
+tmap_save(tm = map_r_squared_dprv, filename = "map_r_squared_dprv_revised.jpg")
+
+--------------------------------------------------------------------------------
+
+#t-value significance level (95%)
+#urv
+
+#diabetes and variables
+#Load data
+gwr_dprv_results <- read_csv("GWR_dprv_results.csv")
+
+#urv
+gwr_dprv_results_significant_urv <- gwr_dprv_results %>%
+  filter(t_urv >= 1.96 | t_urv <= -1.96) %>%
+  select(FIPS_Code, beta_urv, t_urv)
+
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_main_dt, gwr_dprv_results_significant_urv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+
+#mhshd_inc
+gwr_dprv_results_significant_mhshd_inc <- gwr_dprv_results %>%
+  filter(t_mhshd_inc >= 1.96 | t_mhshd_inc <= -1.96) %>%
+  select(FIPS_Code, beta_mhshd_inc, t_mhshd_inc)
+
+merge_spatial_non_spatial_dprv_dt  <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_mhshd_inc, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#nhaarv
+gwr_dprv_results_significant_nhaarv <- gwr_dprv_results %>%
+  filter(t_nhaarv >= 1.96 | t_nhaarv <= -1.96) %>%
+  select(FIPS_Code, beta_nhaarv, t_nhaarv)
+
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_nhaarv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#hrv
+gwr_dprv_results_significant_hrv <- gwr_dprv_results %>%
+  filter(t_hrv >= 1.96 | t_hrv <= -1.96) %>%
+  select(FIPS_Code, beta_hrv, t_hrv)
+
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_hrv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#nhwrv
+gwr_dprv_results_significant_nhwrv <- gwr_dprv_results %>%
+  filter(t_nhwrv >= 1.96 | t_nhwrv <= -1.96) %>%
+  select(FIPS_Code, beta_nhwrv, t_nhwrv)
+
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_nhwrv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+
+#frv
+gwr_dprv_results_significant_frv <- gwr_dprv_results %>%
+  filter(t_frv >= 1.96 | t_frv <= -1.96) %>%
+  select(FIPS_Code, beta_frv, t_frv)
+
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_frv, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#m_age
+gwr_dprv_results_significant_m_age <- gwr_dprv_results %>%
+  filter(t_m_age >= 1.96 | t_m_age <= -1.96) %>%
+  select(FIPS_Code, beta_m_age, t_m_age)
+
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_m_age, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+
+#bdh
+gwr_dprv_results_significant_bdh <- gwr_dprv_results %>%
+  filter(t_bdh >= 1.96 | t_bdh <= -1.96) %>%
+  select(FIPS_Code, beta_bdh, t_bdh)
+
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_bdh, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#carown
+gwr_dprv_results_significant_carown <- gwr_dprv_results %>%
+  filter(t_carown >= 1.96 | t_carown <= -1.96) %>%
+  select(FIPS_Code, beta_carown, t_carown)
+
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_carown, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#prk_10m_r
+gwr_dprv_results_significant_prk_10m_r <- gwr_dprv_results %>%
+  filter(t_prk_10m_r >= 1.96 | t_prk_10m_r <= -1.96) %>%
+  select(FIPS_Code, beta_prk_10m_r, t_prk_10m_r)
+  
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_prk_10m_r, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#lac_grspm
+gwr_dprv_results_significant_lac_grspm <- gwr_dprv_results %>%
+  filter(t_lac_grspm >= 1.96 | t_lac_grspm <= -1.96) %>%
+  select(FIPS_Code, beta_lac_grspm, t_lac_grspm)
+
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_lac_grspm, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+#fastfd_dn
+gwr_dprv_results_significant_fastfd_dn <- gwr_dprv_results %>%
+  filter(t_fastfd_dn >= 1.96 | t_fastfd_dn <= -1.96) %>%
+  select(FIPS_Code, beta_fastfd_dn, t_fastfd_dn)
+  
+merge_spatial_non_spatial_dprv_dt <- left_join(merge_spatial_non_spatial_dprv_dt, gwr_dprv_results_significant_fastfd_dn, by = "FIPS_Code", all.y=TRUE, duplicateGeoms = TRUE)
+
+
+--------------------------------------------------------------------------------
+
+#plot
+#style = "quantile", n = 5, pal = "-RdYlBu"
+
+#coefficients (park access)
+summary(merge_spatial_non_spatial_dprv_dt$beta_prk_10m_r)
+
+#saved it for later use
+map_coefficients_park_access_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) + tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_prk_10m_r", breaks = c(-1.164, -0.333, -0.19, -0.138, 0, 0.171), pal = c("blue3", "dodgerblue3",
+  "steelblue3", "lavender", "lightsalmon"), midpoint = NA, textNA="insignificant", colorNA = "white", title =
+  "Coefficients") +
+  tm_layout(main.title = "Park access", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0, legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#use this (park access)
+map_coefficients_park_access_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) + tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_prk_10m_r", style = "quantile", n = 10, pal = "-Blues", midpoint = NA, textNA="Non-significant", colorNA = "white", title =
+  "Coefficients") +
+  tm_layout(main.title = "Park access", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#save to jpg file
+tmap_save(tm = map_coefficients_park_access_dprv, filename = "coefficients_park_access_dprv_sig_revised.jpg")
+
+
+#coefficients (education: bdh)
+summary(merge_spatial_non_spatial_dprv_dt$beta_bdh)
+
+#use this (education: bdh)
+map_coefficients_bdh_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_bdh", breaks = c(-0.723, -0.429, -0.327, -0.263, -0.138), pal = c("blue3", "dodgerblue3", "steelblue3", "lavender"), midpoint = NA, textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Bachelor's degree or higher", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_bdh_dprv, filename = "coefficients_education_dprv_sig.jpg")
+
+
+#coefficients (vehicle ownership)
+summary(merge_spatial_non_spatial_dprv_dt$beta_carown)
+
+#use this (vehicle ownership)
+map_coefficients_carown_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_carown", breaks = c(-0.265, -0.166, 0, 0.171, 0.217, 0.312), pal = c("blue3", "dodgerblue3",
+  "lightsalmon", "darkorange1", "firebrick2"), textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Vehicle access", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#save to jpg file
+tmap_save(tm = map_coefficients_carown_dprv, filename = "coefficients_car_ownership_dprv_sig.jpg")
+
+
+#coefficients (non-Hispanic African American)
+summary(merge_spatial_non_spatial_dprv_dt$beta_nhaarv)
+
+#use this (non-Hispanic African American)
+map_coefficients_nhaarv_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_nhaarv", breaks = c(-3.448, -0.854, -0.292, 0, 0.687, 1.952), pal = c("blue3", "dodgerblue3", "steelblue3",
+  "lightsalmon", "firebrick2"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "non-Hispanic Black", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+
+#save to jpg file
+tmap_save(tm = map_coefficients_nhaarv_dprv, filename = "coefficients_Black_dprv_sig.jpg")
+
+
+#coefficients (Hispanic)
+summary(merge_spatial_non_spatial_dprv_dt$beta_hrv)
+
+#use this (Hispanic)
+map_coefficients_hrv_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_hrv", breaks = c(-2.829, -0.635, -0.455, -0.375, 0, 1.354), pal = c("blue3", "dodgerblue3",
+  "steelblue3", "lavender", "lightsalmon"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Hispanic", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_hrv_dprv, filename = "coefficients_Hispanic_dprv_sig.jpg")
+
+
+#coefficients (White)
+summary(merge_spatial_non_spatial_dprv_dt$beta_nhwrv)
+
+#use this (White)
+map_coefficients_nhwrv_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_nhwrv", breaks = c(-3.125, -0.74, -0.491, -0.375, 0, 1.111), pal = c("blue3", "dodgerblue3",
+  "steelblue3", "lavender", "lightsalmon"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "non-Hispanic White", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_nhwrv_dprv, filename = "coefficients_White_dprv_sig.jpg")
+
+
+#coefficients (income)
+summary(merge_spatial_non_spatial_dprv_dt$beta_mhshd_inc)
+
+#use this (income)
+map_coefficients_mhshd_inc_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_mhshd_inc", breaks = c(-0.521, -0.308, -0.227, -0.178, 0, 0.341), pal = c("blue3", "dodgerblue3",
+  "steelblue3", "lavender", "lightsalmon"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Median household income", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_mhshd_inc_dprv, filename = "coefficients_income_dprv_sig.jpg")
+
+
+#coefficients (median age)
+summary(merge_spatial_non_spatial_dprv_dt$beta_m_age)
+
+#use this (median age)
+map_coefficients_m_age_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_m_age", breaks = c(0.082, 0.209, 0.26, 0.313, 0.579), pal = c("lightsalmon", "darkorange1", "firebrick", "red2"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Median age", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_m_age_dprv, filename = "coefficients_median_age_dprv_sig.jpg")
+
+
+#coefficients (unemployment)
+summary(merge_spatial_non_spatial_dprv_dt$beta_urv)
+
+#use this (unemployment)
+map_coefficients_urv_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_urv", breaks = c(-0.641, -0.154, 0, 0.159, 0.245, 0.598), pal = c("blue3", "dodgerblue3",
+  "lightsalmon", "darkorange1", "firebrick2"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Unemployment", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_urv_dprv, filename = "coefficients_unemployment_dprv_sig.jpg")
+
+
+#coefficients (gender)
+summary(merge_spatial_non_spatial_dprv_dt$beta_frv)
+
+#use this (gender)
+map_coefficients_frv_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_frv", breaks = c(0.078, 0.114, 0.137, 0.173, 0.329), pal = c("lightsalmon", "darkorange1", "firebrick", "red2"),
+  textNA="insignificant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Female", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom")) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+  
+#save to jpg file
+tmap_save(tm = map_coefficients_frv_dprv, filename = "coefficients_frv_dprv_sig.jpg")
+
+
+
+#coefficients (food desert)
+summary(merge_spatial_non_spatial_dprv_dt$beta_lac_grspm)
+
+#use this (food desert)
+map_coefficients_lac_grspm_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_lac_grspm", style = "quantile", n = 10, pal = "OrRd", midpoint = NA, textNA="Non-significant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Food desert", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#save to jpg file
+tmap_save(tm = map_coefficients_lac_grspm_dprv, filename = "coefficients_food_desert_dprv_sig_revised.jpg")
+
+
+#coefficients (food swamp)
+summary(merge_spatial_non_spatial_dprv_dt$beta_fastfd_dn)
+
+#use this (food swamp)
+map_coefficients_fastfd_dn_dprv <- tm_shape(merge_spatial_non_spatial_dprv_dt) +
+  tm_borders(col="gray", lwd=0.1) +
+  tm_polygons(col = "beta_fastfd_dn", style = "quantile", n = 10, pal = "YlOrBr", midpoint = NA, textNA="Non-significant", colorNA = "white", title = "Coefficients") +
+  tm_layout(main.title = "Food swamp", main.title.position="left") +
+  tm_layout(frame = FALSE) +
+  tm_layout(legend.title.size = 1.2, legend.text.size = 1.0,
+  legend.position = c("right", "bottom"),
+  inner.margins = c(0.01, 0.01, 0.01, 0.1)) +
+  tm_shape(st_contiguous) +
+  tm_borders(col="black", lwd=0.2)
+
+#save to jpg file
+tmap_save(tm = map_coefficients_fastfd_dn_dprv, filename = "coefficients_food_swamp_dprv_sig_revised.jpg")
+
