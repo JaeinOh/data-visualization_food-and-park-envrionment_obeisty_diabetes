@@ -108,7 +108,7 @@ gwr_aorv_results <- read_csv("GWR_aorv_results.csv")
 
 #need to complete the code below to extract coefficients that are statistically significant
 #t-value significance level (95%)
-#urv
+#urv (unemployed)
 gwr_aorv_results_significant_urv <- gwr_aorv_results %>%
   filter(t_urv >= 1.96 | t_urv <= -1.96) %>%
   select(FIPS_Code, beta_urv, t_urv)
